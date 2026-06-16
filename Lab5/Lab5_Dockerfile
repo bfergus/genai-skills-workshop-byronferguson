@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.6
+# ---------- Stage 1: builder ----------
+FROM python:3.12-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /build
+
+COPY Lab5_requirements.txt ./requirements.txt
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# ---------- Stage 2: runtime ----------
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/home/app/.local/bin:${PATH}" \
+    PORT=8080
+
+# Non-root user
+RUN groupadd --system app && useradd --system --gid app --create-home app
+
+WORKDIR /app
+
+# Copy installed Python packages from builder
+COPY --from=builder /root/.local /home/app/.local
+
+# Copy application code
+COPY Lab5_agent.py ./Lab5_agent.py
+COPY Lab5_app.py ./Lab5_app.py
+COPY Lab5_static ./Lab5_static
+
+RUN chown -R app:app /app /home/app/.local
+USER app
+
+EXPOSE 8080
+
+CMD ["uvicorn", "Lab5_app:app", "--host", "0.0.0.0", "--port", "8080"]
